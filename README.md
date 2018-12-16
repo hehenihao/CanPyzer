@@ -1,2 +1,2 @@
 # CanPyzer
-a python tool for analyze can signal with ZLG can device
+a python tool for analyzing can signal with ZLG can device
