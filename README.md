@@ -7,8 +7,6 @@
 - 数据保存（csv）
 - 数据可视化 [模块](https://github.com/hehenihao/pySnippets/tree/master/04_canvasPlot)
 
-程序``enbaleOfflineTest``变量用于没有连接CAN设备情况下，自动生成测试数据，生成数据与测试用dbc中报文id数据配套（启动后本次无法暂停，程序标题会增加Testing字样，测试用dbc位于data目录）。
-
 ### Screenshoots
 - 主界面
 ![pic1](screenshots/1.png)
@@ -25,4 +23,5 @@
 - 绘图模块增加双游标功能，方便数据分析。
 
 ##### Tips
-由于``tkinter``的表格组件无直接编辑功能，某些需要编辑数据的表格采用双击弹框的方式进行。
+- 由于``tkinter``的表格组件无直接编辑功能，某些需要编辑数据的表格采用双击弹框的方式进行。
+- 程序``enbaleOfflineTest``变量用于没有连接CAN设备情况下，自动生成测试数据，生成数据与测试用dbc中报文id数据配套（启动后本次无法暂停，程序标题会增加Testing字样，测试用dbc位于data目录）。
