@@ -1,0 +1,122 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: DCDC ACM EPS
+
+
+BO_ 1 Send1: 8 DCDC
+ SG_ DcdcWorkSts : 57|2@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ DcdcTemp : 8|8@1+ (1,-40) [-40|150] "℃" Vector__XXX
+ SG_ DcdcSts : 61|3@1+ (1,0) [0|7] "" Vector__XXX
+ SG_ DcdcOutVol : 16|16@1+ (0.05,0) [0|3276.75] "V" Vector__XXX
+ SG_ DcdcOutCur : 32|16@1+ (0.05,-1600) [-1600|1600] "A" Vector__XXX
+ SG_ DcdcErrLevel : 59|2@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ DcdcErrCode : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ DcdcCANVer : 0|8@1+ (0.01,0) [1|2.5] "" Vector__XXX
+
+BO_ 2 Received2: 3 Vector__XXX
+ SG_ AirPressFront : 8|8@1+ (0.01,0) [0|100] "MPa"  ACM
+ SG_ AirPressBack : 16|8@1+ (0.01,0) [0|100] "MPa"  ACM
+
+BO_ 3 Send3: 1 ACM
+ SG_ AcmCtrllorTemp : 0|8@1+ (1,-40) [-40|150] "℃" Vector__XXX
+
+BO_ 4 Send4: 8 ACM
+ SG_ AcmTemp : 40|8@1+ (1,-40) [-40|150] "℃" Vector__XXX
+ SG_ AcmSts : 60|2@1+ (1,0) [0|2] "" Vector__XXX
+ SG_ AcmPerChargeSts : 63|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ AcmOutCur : 32|8@1+ (1,0) [0|0] "A" Vector__XXX
+ SG_ AcmMotorSpd : 7|16@0+ (0.125,0) [0|8192] "rpm" Vector__XXX
+ SG_ AcmGenVol : 16|16@1+ (0.1,0) [0|6553.5] "V" Vector__XXX
+ SG_ AcmLifeCent : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ AcmErrCode : 56|4@1+ (1,0) [0|12] "" Vector__XXX
+
+BO_ 5 Received5: 8 Vector__XXX
+ SG_ AcmEnable : 0|8@1+ (1,0) [0|255] ""  ACM
+
+BO_ 6 Send6: 8 EPS
+ SG_ EpsSts : 60|2@1+ (1,0) [0|2] "" Vector__XXX
+ SG_ EpsPerChargeSts : 63|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ EpsOutCur : 32|8@1+ (1,0) [0|255] "A" Vector__XXX
+ SG_ EpsMotorSpd : 0|16@1+ (0.125,0) [0|65535] "rpm" Vector__XXX
+ SG_ EpsLifeCent : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ EpsGenVol : 16|16@1+ (0.1,0) [0|6553.5] "V" Vector__XXX
+ SG_ EpsErrCode : 56|4@1+ (1,0) [0|9] "" Vector__XXX
+ SG_ EpsCtrllorType : 62|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ EpsCtrllorTemp : 40|8@1+ (1,0) [0|255] "℃" Vector__XXX
+
+
+
+CM_ SG_ 1 DcdcWorkSts "DC/DC 工作状态：00：停机01：充电10：充电完成11：保留";
+CM_ SG_ 1 DcdcTemp "DC-DC 模块温度";
+CM_ SG_ 1 DcdcSts "基本状态：100：控制电源接通(PowerUp)
+000：就绪(Reday)
+111：诊断和标定(Diag_Cali)
+101：故障(Error)";
+CM_ SG_ 1 DcdcOutVol "DC-DC 输出电压";
+CM_ SG_ 1 DcdcOutCur "DC-DC 输出电流";
+CM_ SG_ 1 DcdcErrLevel "故障级别位：00:1 级(最高级) 01:2 级(次高级)10:3 级(一般故障) 11:4 级(轻微故障)";
+CM_ SG_ 1 DcdcErrCode "DC-DC 故障代码";
+CM_ SG_ 1 DcdcCANVer "DC-DC CAN 通讯协议版本号";
+CM_ SG_ 3 AcmCtrllorTemp "气泵控制器温度";
+CM_ SG_ 4 AcmSts "电机控制器基本状态
+00：准备就绪（Ready）
+01：运行状态（Enable）
+10：系统故障（Error）";
+CM_ SG_ 4 AcmPerChargeSts "控制器预充电完
+成状态反馈
+0：软启动未完成
+1：软启动完成";
+CM_ SG_ 4 AcmMotorSpd "电机转速";
+CM_ SG_ 4 AcmGenVol "控制器母线电压";
+CM_ SG_ 5 AcmEnable "气泵启停指令：0x00 停止；0x01 运行";
+CM_ SG_ 6 EpsSts "电动油泵状态：
+00=停止
+01=运行中
+10=故障";
+CM_ SG_ 6 EpsPerChargeSts "控制器预充电状态反馈：
+0=未完成
+1=完成";
+CM_ SG_ 6 EpsOutCur "控制器电流";
+CM_ SG_ 6 EpsMotorSpd "电机转速";
+CM_ SG_ 6 EpsLifeCent "心跳信号";
+CM_ SG_ 6 EpsGenVol "控制器母线电压";
+CM_ SG_ 6 EpsErrCode "故障代码";
+CM_ SG_ 6 EpsCtrllorType "0=内部控制，额定转速，上电默认状态；
+1=外部控制，响应0x";
+CM_ SG_ 6 EpsCtrllorTemp "控制器温度";
+BA_DEF_  "BusType" STRING ;
+BA_DEF_DEF_  "BusType" "CAN";
+
