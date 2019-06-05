@@ -396,6 +396,7 @@ class Plotter(Canvas):
         self._scrollOn = False
         self._lineNum = linenum
         self._firststart = True
+        self._scrollDelay = 0
         # this data is used to keep track of an item being dragged
         # in this app, only vertical position
         self._drag_data = {"sx": 0, "sy": 0, "x": 0, "y": 0, "item": None}
@@ -426,7 +427,7 @@ class Plotter(Canvas):
             self.setRulerValue()
 
             self.autoScrollToEnd()
-
+            
             self.setSignalTip()
 
         self.after(self._interval, self.__loop)
@@ -870,11 +871,12 @@ class Plotter(Canvas):
         for signal in self._lines:
             signal.setSelected(selected=False)
         self._drag_data['item'] = None
-        # print('down', event.x, event.y)
+        # print('down', event.x, event.y, self.canvasx(0))
         # _items = self.find_closest(event.x, event.y)
         # print('closest', self.gettags(_items[0]))
+        _x = self.canvasx(0)
         _items1 = self.find_overlapping(
-            event.x-3, event.y-3, event.x+3, event.y+3)
+            event.x-3+_x, event.y-3, event.x+3+_x, event.y+3)
         _currentItem = None
         for _item in _items1:
             _tags = self.gettags(_item)
@@ -884,6 +886,7 @@ class Plotter(Canvas):
             elif 'sigtip' in _tags:
                 # if selected item is sigtip, show or hide the signal
                 selectedid = _tags[1][3:]
+                print(selectedid, _tags)
                 _line = self.getSignalbyId(selectedid)
                 if _line.hidden:
                     _line.show()
