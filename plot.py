@@ -7,7 +7,7 @@ import random
 import time
 import tkinter as tk
 from threading import Thread
-from tkinter import Canvas, Scrollbar, filedialog
+from tkinter import Canvas, Scrollbar, filedialog, Toplevel
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -113,7 +113,7 @@ class Line:
         self._canvas.itemconfig(self.id, state=tk.HIDDEN)
         self.hidden = True
         self.selected = False
-        self.restore()
+        # self.restore()
 
     def show(self):
         self._canvas.itemconfig(self.id, state=tk.NORMAL)
@@ -175,8 +175,8 @@ class Line:
         self._starty = (self._miny + self._maxy) / 2
 
         # for point in points:
-            # self._valy.append(point)
-            # self.addPoint(point)
+        # self._valy.append(point)
+        # self.addPoint(point)
 
     def plot(self):
         if self._canvas is not None and len(self._points) > 1 and self._starty is not None and self.hidden is False:
@@ -367,6 +367,7 @@ class Plotter(Canvas):
         self.configure(yscrollcommand=None,
                        xscrollcommand=self._canvashScrolled)
         self.bind("<Button-1>", self.__mouseDown)
+        self.bind('<Button-3>', self.__mouseRightDown)
         self.bind("<MouseWheel>", self.__mouseScale)
         self.bind("<B1-Motion>", self.__mouseDownMove)
         self.bind("<B1-ButtonRelease>", self.__mouseUp)
@@ -376,20 +377,31 @@ class Plotter(Canvas):
         self["xscrollincrement"] = 1
         self["yscrollincrement"] = 1
         self.__dataList = []
-        self._rulerdata = [0]*linenum
+        self._vernierdata = [0]*linenum
         self.x = 0
         self.scrollx = 3.0
         self.offsety = 0
         self._interval = interval  # main loop interval to handle input data
         self._lengthx = lengthx  # scrollregion x
-        self._rulerOn = False
+        self._vernierOn = False
+        self._doubleVernierOn = False
         self._dragOn = drag  # enable mouse move items
         self._gridOn = True  # draw grid lines
         self._loopOn = True
         self._tipOn = False
         self._adaptation = adaptation
-        self._ruler = None
-        self._rulerX = -1
+        self._vernier = None
+        self._vernierX = -1
+        self._lastVernierCanvasX = -1
+        # double verniers
+        self._rightVernier = None
+        self._leftVernier = None
+        self._rightVernierX = -1
+        self._leftVernierX = -1
+        # force update double-vernier by reset the value to -1
+        self._lastRightVernierCanvasX = -1
+        self._lastLeftVernierCanvasX = -1
+        self._doubleVernierDistance = tk.IntVar()  # 0-any distance
         self._save = save  # 保存数据
         self._dataWriter = None  # 数据保存writer
         self._datafile = ''  # 保存文件名称
@@ -397,9 +409,11 @@ class Plotter(Canvas):
         self._lineNum = linenum
         self._firststart = True
         self._scrollDelay = 0
+        self._popLock = 0  # 防止多个toplevel
         # this data is used to keep track of an item being dragged
         # in this app, only vertical position
-        self._drag_data = {"sx": 0, "sy": 0, "x": 0, "y": 0, "item": None}
+        self._drag_data = {"sx": 0, "sy": 0, "x": 0,
+                           "y": 0, "item": None, "type": 'signal'}
         self._lines = []
         self.after(200, self.__initCanvas)
 
@@ -422,13 +436,23 @@ class Plotter(Canvas):
                 # _line.adaptation()
                 if _line.getLineLen() > 0:
                     _line.plot()
-                pass
 
-            self.setRulerValue()
+            self.setVernierValue()
+
+            self.setDoubleVernierValue()
 
             self.autoScrollToEnd()
-            
+
             self.setSignalTip()
+
+        # always make vernier at top
+        if self._doubleVernierOn:
+            self.tag_raise('double_valuey')
+            self.tag_raise('left_vernier')
+            self.tag_raise('right_vernier')
+        if self._vernierOn:
+            self.tag_raise('valuey')
+            self.tag_raise('vernier')
 
         self.after(self._interval, self.__loop)
 
@@ -463,14 +487,23 @@ class Plotter(Canvas):
 
         self._dragOn = on
 
-    def setRuler(self, on=False):
+    def setVernier(self, on=False):
         '''show or hide coordinates when mouse move
 
         Keyword Arguments:
-            on {bool} -- true for show ruler (default: {False})
+            on {bool} -- true for show vernier (default: {False})
         '''
 
-        self._rulerOn = on
+        self._vernierOn = on
+
+    def setDoubleVernier(self, on=False):
+        '''enable or disable double vernier function 
+
+        Keyword Arguments:
+            on {bool} -- true for enable double vernier (default: {False})
+        '''
+
+        self._doubleVernierOn = on
 
     def setInterval(self, interval=20):
         '''set mainloop interval
@@ -514,17 +547,43 @@ class Plotter(Canvas):
         else:
             self.delete('sigtip')
 
-    def setRulerValue(self):
-        '''draw ruler and valuey tip by given rulerx
+    def setVernierValue(self):
+        '''draw vernier and valuey tip by given vernierx
         '''
 
-        self.delete('valuey')
-        self.delete('ruler')
-        if not self._rulerOn or self._rulerX < 0:
+        x = self.canvasx(self._vernierX)
+        if self._lastVernierCanvasX == x:
             return
-        x = self.canvasx(self._rulerX)
+        self.delete('valuey')
+        self.delete('vernier')
+        if not self._vernierOn or self._vernierX < 0:
+            self._lastVernierCanvasX = -1
+            return
+        self.drawOneVernierValue(x)
+        self._lastVernierCanvasX = x
+
+    def setDoubleVernierValue(self):
+        x1 = self.canvasx(self._rightVernierX)
+        x2 = self.canvasx(self._leftVernierX)
+        if self._lastRightVernierCanvasX == x1 and self._lastLeftVernierCanvasX == x2:
+            return
+        self.delete('double_valuey')
+        self.delete('left_vernier')
+        self.delete('right_vernier')
+        if not self._doubleVernierOn:
+            return
+        self.drawOneVernierValue(x1, linetag='right_vernier', texttag='double_valuey')
+        self.drawOneVernierValue(x2, linetag='left_vernier', texttag='double_valuey')
+        self.drawTriangle(x1, tagname='right_vernier')
+        self.drawTriangle(x2, tagname='left_vernier')
+        self._lastRightVernierCanvasX = x1
+        self._lastLeftVernierCanvasX = x2
+
+    def drawOneVernierValue(self, x, linecolor='#FFFAFA', textcolor='#FFFZFA', linetag='vernier', texttag='valuey'):
         self.create_line(
-            (x, 0, x, self._height), fill="#FFFAFA", tags=('ruler', ))
+            (x, 0, x, self._height), fill=linecolor, tags=(linetag, ))
+        self.create_text(x+5, self._height-12, text='X-'+str(self.canvasx(x)), fill='#808090',
+                         font=('微软雅黑', 7), tags=(texttag, ), anchor='w')
         for _line in self._lines:
             if x > _line.getLineLen() or _line.hidden:
                 continue
@@ -532,8 +591,14 @@ class Plotter(Canvas):
             valuey = _line.getScreenY(x)
             y = valuey
             # self.create_rectangle(x+5, y-15, x+15, y-5,  tags=('valuey', ), fill=_line.color, outline=_line.color)
-            self.create_text(x+5, y-5, text=tipy, fill='#FFF',
-                             font=('微软雅黑', 9), tags=('valuey', ), anchor='w')
+            self.create_text(x+5, y-5, text=tipy, fill=textcolor,
+                             font=('微软雅黑', 9), tags=(texttag, ), anchor='w')
+
+    def drawTriangle(self, x, tagname='double_vernier', color='#FFFZFA'):
+        self.create_polygon([x-5, 0, x+5, 0, x, 10],
+                            outline=color, fill=color, tags=(tagname, ))
+        self.create_polygon([x-5, self._height-2, x+5, self._height-2, x,
+                             self._height-12], outline=color, fill=color, tags=(tagname, ))
 
     def setScroll(self, on=True):
         self._scrollOn = on
@@ -626,6 +691,7 @@ class Plotter(Canvas):
         if len(_lines) == 0:
             return
         _blockHeight = _height / len(_lines)
+        self._lastLeftVernierCanvasX = -1
 
         for i, _line in enumerate(_lines):
             desty = 20 + (i+1)*_blockHeight - _blockHeight / 2
@@ -646,6 +712,7 @@ class Plotter(Canvas):
     def resortSignals(self):
         # if self.find_withtag('auxiliary'):
         self.delete('auxiliary')
+        self._lastLeftVernierCanvasX = -1
         for _line in self._lines:
             _line.restore()
 
@@ -764,7 +831,7 @@ class Plotter(Canvas):
             _index = random.randint(0, len(_list) - 1)
             _random = _list[_index]
             _list.remove(_random)
-            _line = Signal(id=str(_lineid[_len]), 
+            _line = Signal(id=str(_lineid[_len]),
                            name=str(_linenames[_len]),
                            canvas=self,
                            history=20000, color=_random,
@@ -776,7 +843,7 @@ class Plotter(Canvas):
         if self._save:
             self._datafile = 'data/' + \
                 time.strftime("%Y_%m_%d_%H_%M_%S",
-                                time.localtime()) + '.csv'
+                              time.localtime()) + '.csv'
             # logger.debug(self._datafile)
             with open(self._datafile, mode='a', encoding='gbk', newline='') as f:
                 self._dataWriter = csv.writer(f)
@@ -842,8 +909,8 @@ class Plotter(Canvas):
         # delta = self.canvasx(10) - self.scrollx
         # for _tip in self.find_withtag('sigtip'):
         #     self.move(_tip, delta, 0)
-        # self.scrollx = self.canvasx(10)    
-    
+        # self.scrollx = self.canvasx(10)
+
     def __resize(self, event):
         # self.update_idletasks()
         if len(self._lines) == 0:
@@ -857,6 +924,7 @@ class Plotter(Canvas):
             self.move(_item, 0, _deltay)
         self._height = self.winfo_height()
         self._width = self.winfo_width()
+        self._lastRightVernierCanvasX = -1  # redraw double vernier
 
     def __mouseScale(self, event):
         if self._drag_data["item"] is None:
@@ -882,6 +950,7 @@ class Plotter(Canvas):
             _tags = self.gettags(_item)
             if 'signal' in _tags:
                 _currentItem = _item
+                self._drag_data['type'] = 'signal'
                 break
             elif 'sigtip' in _tags:
                 # if selected item is sigtip, show or hide the signal
@@ -893,56 +962,141 @@ class Plotter(Canvas):
                 else:
                     _line.hide()
                 break
+            elif 'left_vernier' in _tags:
+                _currentItem = _item
+                self._drag_data['type'] = 'left_vernier'
+                break
+            elif 'right_vernier' in _tags:
+                _currentItem = _item
+                self._drag_data['type'] = 'right_vernier'
+                break
+
         if _currentItem is not None:
-            _tags = self.gettags(_currentItem)
-            self._drag_data['item'] = self.getSignalbyTags(_tags)
+            if self._drag_data['type'] == 'signal':
+                _tags = self.gettags(_currentItem)
+                self._drag_data['item'] = self.getSignalbyTags(_tags)
+                self._drag_data['x'] = 0
+                self._drag_data['y'] = event.y
+
+                if hasattr(self._drag_data['item'], 'id'):
+                    self._selectOneSignal(self._drag_data['item'].id)
+                    self.tag_raise(self._drag_data['item'].id)  # raise this signal
+            else:
+                self._drag_data['item'] = _currentItem
+                self._drag_data['x'] = event.x
+                self._drag_data['y'] = event.y
+
             self._drag_data['sy'] = event.y
             self._drag_data['sx'] = event.x
-            self._drag_data['y'] = event.y
-            self._drag_data['x'] = 0
 
-            self._selectOneSignal(self._drag_data['item'].id)
-            self.tag_raise(self._drag_data['item'].id)  # raise this signal
+    def __mouseRightDown(self, event):
+        if self._doubleVernierOn and self._popLock == 0:
+            self._popLock = 1
+            self._paramTop = Toplevel()
+            w = 260
+            h = 100
+            # 计算 x, y 位置
+            x = (self._width / 2) - (w / 2)
+            y = (self._height / 2) - (h / 2) - 20
+            self._paramTop.attributes('-alpha', 1.0)
+            self._paramTop.attributes('-topmost', True)
+            self._paramTop.positionfrom(who='user')
+            self._paramTop.resizable(width=False, height=False)
+            self._paramTop.title('设置距离')
+            self._paramTop.geometry('{}x{}+{}+{}'.format(w, h, int(x), int(y)))
+
+            tk.Entry(self._paramTop, textvariable=self._doubleVernierDistance).pack(fill=tk.X)
+
+            _row3 = tk.Frame(self._paramTop)
+            _row3.pack(pady=20, fill=tk.BOTH, expand=tk.TRUE)
+            tk.Button(_row3, text='确定', font=('微软雅黑', 9), width=6,
+                      command=self._setDoubleVernierDistance).pack(side=tk.LEFT, padx=40)
+            tk.Button(_row3, text='取消', font=('微软雅黑', 9), width=6,
+                      command=self._cancelDoubleVernierDistance).pack(side=tk.LEFT, padx=40)
+            self._paramTop.protocol(
+                'WM_DELETE_WINDOW', self._cancelDoubleVernierDistance)
 
     def __mouseDownMove(self, event):
         '''Handle dragging of an object'''
-        if self._drag_data["item"] is None or self._dragOn is not True:
+        if self._drag_data["item"] is None:
             return
-        # compute how much the mouse has moved
-        # delta_x = 0 # event.x - self._drag_data["x"]
-        delta_y = event.y - self._drag_data["y"]
-        # offset_y = event.y - self._drag_data["sy"]
-        self._drag_data["item"].moveY(delta_y)
-        # record the new position
-        self._drag_data["x"] = 0
-        self._drag_data["y"] = event.y
+        if self._drag_data['type'] == 'signal':
+            if self._dragOn is not True:
+                return
+            # compute how much the mouse has moved
+            # delta_x = 0 # event.x - self._drag_data["x"]
+            delta_y = event.y - self._drag_data["y"]
+            # offset_y = event.y - self._drag_data["sy"]
+            self._drag_data["item"].moveY(delta_y)
+            # record the new position
+            self._drag_data["x"] = 0
+            self._drag_data["y"] = event.y
+        else:
+            if self._doubleVernierOn:
+                _distance = self._doubleVernierDistance.get()
+                if self._drag_data['type'] == 'right_vernier':
+                    self._rightVernierX = event.x
+                    if _distance != 0:
+                        self._leftVernierX = self._rightVernierX - _distance
+                    elif self._rightVernierX <= self._leftVernierX:
+                        self._rightVernierX = self._leftVernierX + 1                        
+                elif self._drag_data['type'] == 'left_vernier':
+                    self._leftVernierX = event.x
+                    if _distance != 0:
+                        self._rightVernierX = self._leftVernierX + _distance
+                    elif self._rightVernierX <= self._leftVernierX:
+                        self._leftVernierX = self._rightVernierX - 1  
 
     def __mouseHoverMove(self, event):
-        if self._rulerOn:
-            # delta_x = event.x - self._rulerX
+        if self._vernierOn:
+            # delta_x = event.x - self._vernierX
             # self.after(80, self.__delayMove, delta_x)
-            self._rulerX = event.x
+            self._vernierX = event.x
             # print(self.gettags(self.find_withtag(tk.CURRENT)))
 
     def __delayMove(self, delta_x):
-        if self._ruler:
-            self.move(self._ruler, delta_x, 0)
+        if self._vernier:
+            self.move(self._vernier, delta_x, 0)
 
     def __mouseUp(self, event):
         # print(event.x, event.y)
+        # force update the double-vernier
+        self._lastLeftVernierCanvasX = -1
         pass
 
     def __mouseEnter(self, event):
-        if self._rulerOn:
-            #     self._ruler = self.create_line(
+        if self._vernierOn:
+            #     self._vernier = self.create_line(
             #         (event.x, 0, event.x, self._height), fill="#FFFAFA")
-            self._rulerX = event.x
+            self._vernierX = event.x
         pass
 
     def __mouseLeave(self, event):
-        self.delete('ruler')
-        self._rulerX = -1
-    
+        self.delete('vernier')
+        self._vernierX = -1
+
+    def _setDoubleVernierDistance(self):
+        self._popLock = 0
+        _distance = self._doubleVernierDistance.get()
+        if _distance > self._width - 10:
+            _distance = self._width - 10
+            self._doubleVernierDistance.set(_distance) 
+        print('distance', _distance)
+        if _distance != 0:
+            if self._leftVernierX + _distance < self._width:
+                self._rightVernierX = self._leftVernierX + _distance
+            elif self._rightVernierX - _distance > 0:
+                self._leftVernierX = self._rightVernierX - _distance
+            else:
+                self._leftVernierX = 5
+                self._rightVernierX = self._leftVernierX + _distance
+        self._paramTop.destroy()
+
+    def _cancelDoubleVernierDistance(self):
+        self._doubleVernierDistance.set(0)
+        self._popLock = 0
+        self._paramTop.destroy()
+
     # --------------- below code just for testing the function ---------------
 
     def _autoTest(self):
@@ -1004,8 +1158,22 @@ class Plotter(Canvas):
         self.x = self.x + 1
         self.after(10, self._autoTest)
 
-    def toggleRuler(self):
-        self._rulerOn = True if self._rulerOn is False else False
+    def toggleVernier(self):
+        self._vernierOn = True if self._vernierOn is False else False
+        if self._vernierOn is True:
+            self._doubleVernierOn = False
+            self._lastRightVernierCanvasX = -1
+            self._lastLeftVernierCanvasX = -1
+
+    def toggleDoubleVernier(self):
+        self._doubleVernierOn = True if self._doubleVernierOn is False else False
+        if self._doubleVernierOn is True:
+            self._leftVernierX = 5
+            self._rightVernierX = self._width - 5
+            self._vernierOn = False
+        else:
+            self._lastRightVernierCanvasX = -1
+            self._lastLeftVernierCanvasX = -1
 
     def toggleDrag(self):
         self._dragOn = True if self._dragOn is False else False
@@ -1068,7 +1236,10 @@ if __name__ == '__main__':
 
     tk.Button(root, text='start', command=plot._autoTest).pack(side=tk.LEFT)
     tk.Button(root, text='clear', command=plot._clear).pack(side=tk.LEFT)
-    tk.Button(root, text='ruler', command=plot.toggleRuler).pack(side=tk.LEFT)
+    tk.Button(root, text='vernier',
+              command=plot.toggleVernier).pack(side=tk.LEFT)
+    tk.Button(root, text='double vernier',
+              command=plot.toggleDoubleVernier).pack(side=tk.LEFT)
     tk.Button(root, text='drag', command=plot.toggleDrag).pack(side=tk.LEFT)
     tk.Button(root, text='grid', command=plot.toggleGrid).pack(side=tk.LEFT)
     tk.Button(root, text='select', command=plot._selectTest).pack(side=tk.LEFT)

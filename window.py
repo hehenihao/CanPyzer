@@ -1,21 +1,22 @@
-from ctypes import *
+import configparser
+import logging
+import os
+import random as rd
+import re
+import sys
 import time
 import tkinter as tk
-from tkinter import messagebox, ttk, Toplevel, Message, filedialog
-import re
-from multiprocessing import Queue, Pool, Process, Value, Array
+from ctypes import *
+from multiprocessing import Array, Pool, Process, Queue, Value
 from threading import Thread
-from dbc import DBC, Frame, Signal
-import os
-import tablePopup as tp
+from tkinter import Message, Toplevel, filedialog, messagebox, ttk
+
 import checkTree as ct
+import plot
 import rawAnalysis as ra
 import tableItemEntry as tie
-import logging
-import configparser
-import sys
-import random as rd
-import plot
+import tablePopup as tp
+from dbc import DBC, Frame, Signal
 
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 enbaleOfflineTest = True  # 启用自动生成测试报文数据
@@ -1356,4 +1357,3 @@ class Canalyzer:
 if __name__ == '__main__':
     canalyzer = Canalyzer()
     canalyzer.run()
-
