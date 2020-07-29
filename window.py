@@ -322,7 +322,7 @@ class Canalyzer:
         helpmenu = tk.Menu(_menu, tearoff=0)
         helpmenu.add_command(label="关于", font=('微软雅黑', 8), command=None)
         helpmenu.add_separator()
-        helpmenu.add_command(label="使用方法", font=('微软雅黑', 8),command=None)
+        helpmenu.add_command(label="使用方法", font=('微软雅黑', 8), command=None)
         _menu.add_cascade(label="帮助", menu=helpmenu)
 
         # full background
@@ -443,7 +443,7 @@ class Canalyzer:
         tk.Button(_btnFrame, text='显示名称',
                   command=self.signalPlotter.toggleTip).pack(side=tk.TOP)
         tk.Button(_btnFrame, text='显示数值',
-                  command=self.signalPlotter.toggleRuler).pack(padx=5, pady=5)
+                  command=self.signalPlotter.toggleVernier).pack(padx=5, pady=5)
         tk.Button(_btnFrame, text='信号排序', command=self.signalPlotter.sortSignals).pack(
             side=tk.BOTTOM)
         tk.Button(_btnFrame, text='暂停当前', command=self.signalPlotter.stopLoop).pack(
@@ -997,13 +997,13 @@ class Canalyzer:
         tk.Button(_btnFrame, text='显示名称',
                   command=_dataPlotter.toggleTip).pack(side=tk.LEFT)
         tk.Button(_btnFrame, text='显示数值',
-                  command=_dataPlotter.toggleRuler).pack(side=tk.LEFT, padx=5)
+                  command=_dataPlotter.toggleVernier).pack(side=tk.LEFT, padx=5)
         tk.Button(_btnFrame, text='信号排序', command=_dataPlotter.sortSignals).pack(
             side=tk.LEFT)
         tk.Button(_btnFrame, text='关闭',
                   command=self._plotDataTop.destroy).pack(side=tk.LEFT, padx=5)
 
-        self.root.after(50, _dataPlotter.loadData, filename)
+        self.root.after(500, _dataPlotter.loadData, filename)
 
 
     def _clearRootList(self):
